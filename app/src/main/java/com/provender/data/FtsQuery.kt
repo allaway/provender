@@ -10,7 +10,9 @@ object FtsQuery {
     fun fromUserInput(input: String): String? {
         val tokens = input
             .split(Regex("\\s+"))
-            .map { it.replace(Regex("[^\\p{L}\\p{Nd}]"), "") }
+            // Lowercase so tokens can never form FTS operators (OR/AND/NOT are uppercase-only);
+            // the default tokenizer is case-insensitive anyway.
+            .map { it.lowercase().replace(Regex("[^\\p{L}\\p{Nd}]"), "") }
             .filter { it.isNotBlank() }
         if (tokens.isEmpty()) return null
         return tokens.joinToString(" ") { "$it*" }

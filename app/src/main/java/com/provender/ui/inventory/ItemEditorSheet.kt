@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.provender.data.entity.InventoryItem
 import com.provender.data.entity.StorageLocation
 import com.provender.data.model.Category
 import com.provender.data.model.QuantityUnits
@@ -45,7 +46,7 @@ fun ItemEditorSheet(
     editorState: EditorState,
     locations: List<StorageLocation>,
     onSave: (ItemDraft) -> Unit,
-    onDelete: (com.provender.data.entity.InventoryItem) -> Unit,
+    onDelete: (InventoryItem) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val existing = editorState.existing

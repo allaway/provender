@@ -16,6 +16,7 @@ object NameNormalizer {
     fun normalize(raw: String): String {
         val cleaned = raw
             .lowercase()
+            .replace(Regex("['’]"), "") // "joe's" -> "joes", not "joe s"
             .replace(Regex("[^\\p{L}\\p{Nd}\\s-]"), " ")
             .replace(Regex("\\s+"), " ")
             .trim()
