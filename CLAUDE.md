@@ -109,3 +109,8 @@ tree — create them when their phase starts.
   fewer moving parts now.
 - **material-icons-extended pinned at 1.7.8** — the artifact left the Compose BOM; 1.7.8 is
   its final version and is forward-compatible.
+- **`app/schemas/` is committed but empty until the first local build** — Room writes
+  `1.json` there during KSP; commit it when it appears so future migrations diff cleanly.
+- **First build in this repo has not been machine-verified** (sandbox network restriction
+  above). If a version in `libs.versions.toml` fails to resolve, bump only the patch digit
+  first — every group/artifact coordinate was verified against Maven listings in July 2026.
