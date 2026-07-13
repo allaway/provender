@@ -11,10 +11,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.provender.ui.capture.CaptureScreen
+import com.provender.ui.confirm.ConfirmScreen
 import com.provender.ui.debug.DebugLlmScreen
 import com.provender.ui.inventory.InventoryScreen
 import com.provender.ui.navigation.TopLevelDestination
@@ -24,6 +28,9 @@ import com.provender.ui.settings.SettingsScreen
 
 /** Hidden route — reachable only via the secret gesture in Settings, never the nav bar. */
 private const val DEBUG_LLM_ROUTE = "debug/llm"
+
+private const val CAPTURE_ROUTE = "capture"
+private const val CONFIRM_ROUTE = "confirm/{snapshotId}"
 
 @Composable
 fun ProvenderRoot() {
@@ -60,7 +67,11 @@ fun ProvenderRoot() {
             startDestination = TopLevelDestination.INVENTORY.route,
             modifier = Modifier.padding(innerPadding),
         ) {
-            composable(TopLevelDestination.INVENTORY.route) { InventoryScreen() }
+            composable(TopLevelDestination.INVENTORY.route) {
+                InventoryScreen(
+                    onOpenCapture = { navController.navigate(CAPTURE_ROUTE) },
+                )
+            }
             composable(TopLevelDestination.RECIPES.route) { RecipesScreen() }
             composable(TopLevelDestination.ROULETTE.route) { RouletteScreen() }
             composable(TopLevelDestination.SETTINGS.route) {
@@ -70,6 +81,26 @@ fun ProvenderRoot() {
             }
             composable(DEBUG_LLM_ROUTE) {
                 DebugLlmScreen(onBack = { navController.popBackStack() })
+            }
+            composable(CAPTURE_ROUTE) {
+                CaptureScreen(
+                    onSnapshotCreated = { snapshotId ->
+                        navController.navigate("confirm/$snapshotId") {
+                            // Confirm replaces Capture on the stack.
+                            popUpTo(CAPTURE_ROUTE) { inclusive = true }
+                        }
+                    },
+                )
+            }
+            composable(
+                route = CONFIRM_ROUTE,
+                arguments = listOf(navArgument("snapshotId") { type = NavType.LongType }),
+            ) {
+                ConfirmScreen(
+                    onDone = {
+                        navController.popBackStack(TopLevelDestination.INVENTORY.route, false)
+                    },
+                )
             }
         }
     }

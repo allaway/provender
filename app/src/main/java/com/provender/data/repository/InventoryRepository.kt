@@ -20,6 +20,8 @@ data class ItemDraft(
     val locationId: Long,
     val isStaple: Boolean = false,
     val notes: String? = null,
+    /** Set when the item came from a barcode scan. */
+    val barcode: String? = null,
 )
 
 /**

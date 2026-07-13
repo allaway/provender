@@ -59,7 +59,7 @@ class DefaultInventoryRepository @Inject constructor(
             val old = requireNotNull(itemDao.getById(itemId)) { "No item with id $itemId" }
             val now = System.currentTimeMillis()
             val updated = draft.toItem(id = itemId, lastSeenAt = now)
-                .copy(lastConfirmedAt = old.lastConfirmedAt, barcode = old.barcode)
+                .copy(lastConfirmedAt = old.lastConfirmedAt, barcode = draft.barcode ?: old.barcode)
             itemDao.update(updated)
             changeDao.insert(
                 InventoryChange(
@@ -129,5 +129,6 @@ class DefaultInventoryRepository @Inject constructor(
         isStaple = isStaple,
         lastSeenAt = lastSeenAt,
         notes = notes?.trim()?.takeIf { it.isNotEmpty() },
+        barcode = barcode,
     )
 }

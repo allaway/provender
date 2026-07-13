@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -13,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.CircularProgressIndicator
@@ -37,13 +39,17 @@ import com.provender.data.entity.InventoryItem
 import com.provender.data.model.Category
 
 @Composable
-fun InventoryScreen(viewModel: InventoryViewModel = hiltViewModel()) {
+fun InventoryScreen(
+    onOpenCapture: () -> Unit = {},
+    viewModel: InventoryViewModel = hiltViewModel(),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(onClick = viewModel::onAddClick) {
-                Icon(Icons.Outlined.Add, contentDescription = "Add item")
+            // SPEC §5.1: the FAB starts a photo/barcode capture session.
+            FloatingActionButton(onClick = onOpenCapture) {
+                Icon(Icons.Outlined.PhotoCamera, contentDescription = "Capture snapshot")
             }
         },
     ) { innerPadding ->
@@ -52,23 +58,31 @@ fun InventoryScreen(viewModel: InventoryViewModel = hiltViewModel()) {
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            OutlinedTextField(
-                value = state.query,
-                onValueChange = viewModel::onQueryChange,
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                placeholder = { Text("Search inventory") },
-                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (state.query.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.onQueryChange("") }) {
-                            Icon(Icons.Outlined.Close, contentDescription = "Clear search")
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = state.query,
+                    onValueChange = viewModel::onQueryChange,
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Search inventory") },
+                    leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (state.query.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.onQueryChange("") }) {
+                                Icon(Icons.Outlined.Close, contentDescription = "Clear search")
+                            }
                         }
-                    }
-                },
-                singleLine = true,
-            )
+                    },
+                    singleLine = true,
+                )
+                IconButton(onClick = viewModel::onAddClick) {
+                    Icon(Icons.Outlined.Add, contentDescription = "Add item manually")
+                }
+            }
 
             when {
                 state.isLoading -> Box(
@@ -113,7 +127,7 @@ private fun GroupedInventoryList(
     val isEmpty = state.sections.all { it.items.isEmpty() }
     if (isEmpty) {
         EmptyState(
-            "Your inventory is empty.\nTap + to add your first item — photo capture arrives in Phase 3.",
+            "Your inventory is empty.\nTap the camera to photograph a shelf, or + to add an item by hand.",
         )
         return
     }

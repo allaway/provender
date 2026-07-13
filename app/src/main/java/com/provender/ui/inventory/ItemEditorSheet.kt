@@ -1,7 +1,6 @@
 package com.provender.ui.inventory
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,16 +8,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -38,6 +31,7 @@ import com.provender.data.entity.StorageLocation
 import com.provender.data.model.Category
 import com.provender.data.model.QuantityUnits
 import com.provender.data.repository.ItemDraft
+import com.provender.ui.components.DropdownField
 
 /** Add/edit bottom sheet. Pure form state; all persistence goes through the ViewModel. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -175,38 +169,6 @@ fun ItemEditorSheet(
                 ) {
                     Text("Delete item", color = MaterialTheme.colorScheme.error)
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun <T> DropdownField(
-    label: String,
-    value: String,
-    options: List<T>,
-    optionLabel: (T) -> String,
-    onSelect: (T) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    Box(modifier = modifier) {
-        OutlinedButton(
-            onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("$label: $value", maxLines = 1)
-            Icon(Icons.Outlined.ArrowDropDown, contentDescription = null)
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(optionLabel(option)) },
-                    onClick = {
-                        onSelect(option)
-                        expanded = false
-                    },
-                )
             }
         }
     }
