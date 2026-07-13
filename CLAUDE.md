@@ -12,7 +12,7 @@ for the full product & technical spec before making changes.
 - [x] **Phase 1 — Inventory core**: entities/DAOs, manual CRUD, locations, search (FTS), staples, change log
 - [x] **Phase 2 — Model runtime**: LiteRT-LM integration, model download manager + progress UI, device capability gating, hidden debug prompt screen (tap the Settings model row 7×)
 - [x] **Phase 3 — Vision capture**: CameraX flow, ML Kit OCR, extraction prompt + parsing, Confirm screen (seed mode), barcode mode + Open Food Facts cache
-- [ ] **Phase 4 — Diffing**: fuzzy matching, three-part diff UI, change-log integration
+- [x] **Phase 4 — Diffing**: fuzzy matching, three-part diff UI, change-log integration
 - [ ] **Phase 5 — Paprika + matching**: `.paprikarecipes` import, ingredient parser, matching engine, Matches tab
 - [ ] **Phase 6 — Web recipes**: TheMealDB provider behind `RecipeSource`
 - [ ] **Phase 7 — Roulette**: deck, tuning, shortlist
@@ -151,6 +151,18 @@ tree — create them when their phase starts.
   Confirm screen is the accuracy backstop per SPEC §4.
 - **Snapshot photos live under `filesDir/snapshots/session-*/`** with `.small.jpg`
   downscaled (≤1024 px long edge) siblings fed to the model; 30-day pruning is Phase 9.
+- **Diff matching = max(Jaro-Winkler, token Jaccard, 0.90 token-subset score) ≥ 0.85** over
+  normalized names, greedy one-to-one assignment. The subset rule makes brand-prefixed names
+  ("trader joe black bean" ~ "black bean") match; it also means a bare "oil" matches "olive
+  oil" — accepted, the Confirm screen is the backstop and Phase 5 synonyms will refine.
+- **Diff semantics**: a null extracted quantity is a *confirmation*, not a change (the model
+  simply gave no amount); a null inventory quantity firming up to a number *is* a change.
+  "Consumed" deletes the item row (+SNAPSHOT_CONSUMED, delta = -old); "Moved" rewrites
+  locationId (+SNAPSHOT_MOVED, delta 0); "Still there", unchanged matches, and declined
+  quantity changes bump lastSeen/lastConfirmedAt with no change row (SPEC §3.2). Units are
+  ignored when deciding "changed" — only quantities count (v1).
+- **A MOVED decision without a chosen target degrades to "still there"** rather than
+  blocking the commit.
 - **First build in this repo has not been machine-verified** (sandbox network restriction
   above). If a version in `libs.versions.toml` fails to resolve, bump only the patch digit
   first — every group/artifact coordinate was verified against Maven listings in July 2026.

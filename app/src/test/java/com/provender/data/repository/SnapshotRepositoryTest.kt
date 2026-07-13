@@ -160,4 +160,79 @@ class SnapshotRepositoryTest {
         }
         assertEquals(SnapshotStatus.COMMITTED, db.snapshotDao().getById(id)!!.status)
     }
+
+    @Test
+    fun `commitDiff applies every decision type with the right change rows`() = runTest {
+        locationId = seedLocation()
+        db.storageLocationDao().insertAll(
+            listOf(StorageLocation(id = 8, name = "Fridge", sortOrder = 1)),
+        )
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val repository = repository(dispatcher)
+        val itemDao = db.inventoryItemDao()
+
+        suspend fun seedItem(name: String, quantity: Double?): Long = itemDao.insert(
+            com.provender.data.entity.InventoryItem(
+                name = name,
+                nameNormalized = name.lowercase(),
+                quantity = quantity,
+                unit = "count",
+                locationId = locationId,
+                lastSeenAt = 1L,
+            ),
+        )
+
+        val changedId = seedItem("beans", 3.0)
+        val consumedId = seedItem("milk", 1.0)
+        val stillThereId = seedItem("flour", 2.0)
+        val movedId = seedItem("butter", 1.0)
+        val snapshotId = db.snapshotDao().insert(
+            Snapshot(
+                locationId = locationId,
+                createdAt = 0L,
+                photoUris = emptyList(),
+                status = SnapshotStatus.READY,
+                extractionJson = "[]",
+            ),
+        )
+
+        repository.commitDiff(
+            snapshotId,
+            DiffCommit(
+                adds = listOf(ItemDraft(name = "salsa", quantity = 1.0, unit = "jar", locationId = locationId)),
+                quantityChanges = listOf(QuantityChangeDecision(changedId, newQuantity = 1.0, newUnit = "can")),
+                consumedItemIds = listOf(consumedId),
+                confirmedItemIds = listOf(stillThereId),
+                moves = listOf(MoveDecision(movedId, toLocationId = 8)),
+            ),
+        )
+
+        // Add
+        val all = itemDao.observeAll().first()
+        assertTrue(all.any { it.name == "salsa" })
+        // Quantity change
+        val changed = itemDao.getById(changedId)!!
+        assertEquals(1.0, changed.quantity!!, 0.0)
+        assertEquals("can", changed.unit)
+        // Consumed: gone from inventory
+        assertEquals(null, itemDao.getById(consumedId))
+        // Still there: timestamps bumped, nothing else
+        val stillThere = itemDao.getById(stillThereId)!!
+        assertTrue(stillThere.lastConfirmedAt != null && stillThere.lastSeenAt > 1L)
+        assertEquals(2.0, stillThere.quantity!!, 0.0)
+        // Moved
+        assertEquals(8L, itemDao.getById(movedId)!!.locationId)
+
+        val changes = db.inventoryChangeDao().observeRecent(20).first()
+        val byReason = changes.groupBy { it.reason }
+        assertEquals(1, byReason[ChangeReason.SNAPSHOT_NEW]!!.size)
+        assertEquals(-2.0, byReason[ChangeReason.SNAPSHOT_QUANTITY]!!.single().delta, 1e-9)
+        assertEquals(-1.0, byReason[ChangeReason.SNAPSHOT_CONSUMED]!!.single().delta, 1e-9)
+        assertEquals(0.0, byReason[ChangeReason.SNAPSHOT_MOVED]!!.single().delta, 0.0)
+        // Still-there confirmation wrote NO change row.
+        assertEquals(4, changes.size)
+        changes.forEach { assertEquals(snapshotId, it.snapshotId) }
+
+        assertEquals(SnapshotStatus.COMMITTED, db.snapshotDao().getById(snapshotId)!!.status)
+    }
 }
