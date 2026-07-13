@@ -11,7 +11,7 @@ for the full product & technical spec before making changes.
 - [x] **Phase 0 — Scaffold**: Gradle project, Hilt, Room, Compose navigation, theme, Settings shell, CI-friendly build
 - [x] **Phase 1 — Inventory core**: entities/DAOs, manual CRUD, locations, search (FTS), staples, change log
 - [x] **Phase 2 — Model runtime**: LiteRT-LM integration, model download manager + progress UI, device capability gating, hidden debug prompt screen (tap the Settings model row 7×)
-- [ ] **Phase 3 — Vision capture**: CameraX flow, ML Kit OCR, extraction prompt + parsing, Confirm screen (seed mode), barcode mode + Open Food Facts cache
+- [x] **Phase 3 — Vision capture**: CameraX flow, ML Kit OCR, extraction prompt + parsing, Confirm screen (seed mode), barcode mode + Open Food Facts cache
 - [ ] **Phase 4 — Diffing**: fuzzy matching, three-part diff UI, change-log integration
 - [ ] **Phase 5 — Paprika + matching**: `.paprikarecipes` import, ingredient parser, matching engine, Matches tab
 - [ ] **Phase 6 — Web recipes**: TheMealDB provider behind `RecipeSource`
@@ -39,16 +39,16 @@ in the catalog, never inline in build files.
 ```
 app/src/main/java/com/provender/
   data/        # Room entities, DAOs, database, repositories; settings/ (SharedPreferences)
-  network/     # ModelDownloadWorker; TheMealDB + Open Food Facts clients (Phase 6/3)
+  network/     # ModelDownloadWorker, Open Food Facts client; TheMealDB client (Phase 6)
   ai/          # LlmEngine + FakeLlmEngine + LitertLmEngine, prompts, lenient JSON parsing,
                #   ModelVariant/ModelRepository/ModelState, capability gating
-  mlkit/       # barcode + OCR wrappers (Phase 3)
+  mlkit/       # BarcodeAnalyzer, OcrClient, PhotoDownscaler
   paprika/     # .paprikarecipes import (Phase 5)
   matching/    # normalization, synonym map, scoring (normalizer exists; rest Phase 5)
   roulette/    # deck building, filters (Phase 7)
   generate/    # flexible-recipe prompt building + validation + cache (Phase 8)
-  ui/          # Compose screens: theme/, navigation/, inventory/, recipes/, roulette/,
-               #   settings/, debug/ (hidden LLM console)
+  ui/          # Compose screens: theme/, navigation/, components/, inventory/, capture/,
+               #   confirm/, recipes/, roulette/, settings/, debug/ (hidden LLM console)
   di/          # Hilt modules
 ```
 
@@ -135,6 +135,22 @@ tree — create them when their phase starts.
   call rawPrompt.
 - **Capability gate**: arm64-v8a required; total RAM ≥ ~5.5 GiB for E2B, ≥ 7 GiB for E4B.
   Below that the model UI is disabled with an explanation (barcode/manual entry unaffected).
+- **Snapshot analysis is an app-scoped coroutine, not a WorkManager job with notification**
+  (SPEC §2 asks for a notification): the job survives navigation and the Confirm screen says
+  it keeps running in the background, but a real OS notification needs POST_NOTIFICATIONS
+  plumbing — deferred to Phase 9 polish. Status/result/error persist on the `snapshots` row,
+  so process death degrades to a FAILED/stuck-ANALYZING row, never data loss.
+- **DB schema still version 1** — Snapshot/BarcodeCache were added pre-release before any
+  build exported `app/schemas/1.json`. First shipped schema locks the version; migrations
+  start after that.
+- **Barcode scans add straight to inventory** (name + brand-in-notes + barcode column,
+  MANUAL_ADD change row) rather than joining the photo session's confirm list — precise
+  entries don't need the VLM review path. Capture FAB is the SPEC §5.1 entry point; manual
+  add moved to the + button beside the inventory search field.
+- **`ExtractedItem.category` maps to the `Category` enum by name/label, else OTHER**; the
+  Confirm screen is the accuracy backstop per SPEC §4.
+- **Snapshot photos live under `filesDir/snapshots/session-*/`** with `.small.jpg`
+  downscaled (≤1024 px long edge) siblings fed to the model; 30-day pruning is Phase 9.
 - **First build in this repo has not been machine-verified** (sandbox network restriction
   above). If a version in `libs.versions.toml` fails to resolve, bump only the patch digit
   first — every group/artifact coordinate was verified against Maven listings in July 2026.
