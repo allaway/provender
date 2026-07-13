@@ -11,8 +11,15 @@ enum class ChangeReason {
     /** Item deleted by hand. */
     MANUAL_DELETE,
 
-    // Snapshot-driven reasons arrive with diffing (Phase 4):
+    /** Item appeared in a snapshot (seed or diff commit). */
     SNAPSHOT_NEW,
+
+    /** Missing from a snapshot and the user marked it consumed. */
     SNAPSHOT_CONSUMED,
+
+    /** Quantity updated from a snapshot diff. */
     SNAPSHOT_QUANTITY,
+
+    /** Missing from a snapshot and the user said it moved to another location (delta 0). */
+    SNAPSHOT_MOVED,
 }

@@ -1,7 +1,9 @@
 package com.provender.testing
 
+import com.provender.data.entity.InventoryItem
 import com.provender.data.entity.Snapshot
 import com.provender.data.entity.SnapshotStatus
+import com.provender.data.repository.DiffCommit
 import com.provender.data.repository.ItemDraft
 import com.provender.data.repository.SnapshotRepository
 import java.io.File
@@ -14,8 +16,14 @@ class FakeSnapshotRepository : SnapshotRepository {
 
     val snapshots = MutableStateFlow<Map<Long, Snapshot>>(emptyMap())
 
+    /** Items per location, controlling seed vs diff mode on the Confirm screen. */
+    val itemsAtLocations = mutableMapOf<Long, List<InventoryItem>>()
+
     /** Calls recorded oldest-first, e.g. "analyze:1:2photos", "commit:1:3items". */
     val calls = mutableListOf<String>()
+
+    /** The last DiffCommit handed to [commitDiff], for detailed assertions. */
+    var lastDiffCommit: DiffCommit? = null
 
     var nextSnapshotId = 1L
 
@@ -60,6 +68,17 @@ class FakeSnapshotRepository : SnapshotRepository {
 
     override suspend fun commitSeed(snapshotId: Long, drafts: List<ItemDraft>) {
         calls += "commit:$snapshotId:${drafts.size}items"
+        snapshots.value[snapshotId]?.let {
+            setSnapshot(it.copy(status = SnapshotStatus.COMMITTED))
+        }
+    }
+
+    override suspend fun itemsAtLocation(locationId: Long): List<InventoryItem> =
+        itemsAtLocations[locationId].orEmpty()
+
+    override suspend fun commitDiff(snapshotId: Long, commit: DiffCommit) {
+        calls += "commitDiff:$snapshotId"
+        lastDiffCommit = commit
         snapshots.value[snapshotId]?.let {
             setSnapshot(it.copy(status = SnapshotStatus.COMMITTED))
         }

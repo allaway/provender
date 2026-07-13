@@ -127,35 +127,114 @@ class DefaultSnapshotRepository @Inject constructor(
             val snapshot = snapshotDao.getById(snapshotId)
                 ?: error("No snapshot with id $snapshotId")
             val now = System.currentTimeMillis()
-            drafts.forEach { draft ->
-                val name = draft.name.trim()
-                val itemId = itemDao.insert(
-                    InventoryItem(
-                        name = name,
-                        nameNormalized = NameNormalizer.normalize(name),
-                        category = draft.category,
-                        quantity = draft.quantity,
-                        unit = draft.unit?.trim()?.takeIf { it.isNotEmpty() },
-                        locationId = snapshot.locationId,
-                        isStaple = draft.isStaple,
+            drafts.forEach { draft -> insertFromSnapshot(snapshot, draft, now) }
+            snapshotDao.update(snapshot.copy(status = SnapshotStatus.COMMITTED))
+        }
+    }
+
+    override suspend fun itemsAtLocation(locationId: Long): List<InventoryItem> =
+        itemDao.listByLocation(locationId)
+
+    override suspend fun commitDiff(snapshotId: Long, commit: DiffCommit) {
+        database.withTransaction {
+            val snapshot = snapshotDao.getById(snapshotId)
+                ?: error("No snapshot with id $snapshotId")
+            val now = System.currentTimeMillis()
+
+            commit.adds.forEach { draft -> insertFromSnapshot(snapshot, draft, now) }
+
+            commit.quantityChanges.forEach { change ->
+                val old = itemDao.getById(change.itemId) ?: return@forEach
+                itemDao.update(
+                    old.copy(
+                        quantity = change.newQuantity,
+                        unit = change.newUnit ?: old.unit,
                         lastSeenAt = now,
                         lastConfirmedAt = now,
-                        notes = draft.notes?.trim()?.takeIf { it.isNotEmpty() },
                     ),
                 )
                 changeDao.insert(
                     InventoryChange(
-                        itemId = itemId,
-                        itemName = name,
+                        itemId = old.id,
+                        itemName = old.name,
                         snapshotId = snapshotId,
-                        delta = draft.quantity ?: 1.0,
-                        reason = ChangeReason.SNAPSHOT_NEW,
+                        delta = (change.newQuantity ?: 0.0) - (old.quantity ?: 0.0),
+                        reason = ChangeReason.SNAPSHOT_QUANTITY,
                         createdAt = now,
                     ),
                 )
             }
+
+            commit.consumedItemIds.forEach { itemId ->
+                val old = itemDao.getById(itemId) ?: return@forEach
+                itemDao.delete(old)
+                changeDao.insert(
+                    InventoryChange(
+                        itemId = old.id,
+                        itemName = old.name,
+                        snapshotId = snapshotId,
+                        delta = -(old.quantity ?: 0.0),
+                        reason = ChangeReason.SNAPSHOT_CONSUMED,
+                        createdAt = now,
+                    ),
+                )
+            }
+
+            // SPEC §3.2: "still there but hidden" (and unchanged matches) update
+            // last_confirmed_at without a change entry.
+            commit.confirmedItemIds.forEach { itemId ->
+                val old = itemDao.getById(itemId) ?: return@forEach
+                itemDao.update(old.copy(lastSeenAt = now, lastConfirmedAt = now))
+            }
+
+            commit.moves.forEach { move ->
+                val old = itemDao.getById(move.itemId) ?: return@forEach
+                itemDao.update(
+                    old.copy(locationId = move.toLocationId, lastSeenAt = now, lastConfirmedAt = now),
+                )
+                changeDao.insert(
+                    InventoryChange(
+                        itemId = old.id,
+                        itemName = old.name,
+                        snapshotId = snapshotId,
+                        delta = 0.0,
+                        reason = ChangeReason.SNAPSHOT_MOVED,
+                        createdAt = now,
+                    ),
+                )
+            }
+
             snapshotDao.update(snapshot.copy(status = SnapshotStatus.COMMITTED))
         }
+    }
+
+    /** Must run inside a transaction. */
+    private suspend fun insertFromSnapshot(snapshot: Snapshot, draft: ItemDraft, now: Long) {
+        val name = draft.name.trim()
+        val itemId = itemDao.insert(
+            InventoryItem(
+                name = name,
+                nameNormalized = NameNormalizer.normalize(name),
+                category = draft.category,
+                quantity = draft.quantity,
+                unit = draft.unit?.trim()?.takeIf { it.isNotEmpty() },
+                locationId = snapshot.locationId,
+                isStaple = draft.isStaple,
+                lastSeenAt = now,
+                lastConfirmedAt = now,
+                notes = draft.notes?.trim()?.takeIf { it.isNotEmpty() },
+            ),
+        )
+        changeDao.insert(
+            InventoryChange(
+                itemId = itemId,
+                itemName = name,
+                snapshotId = snapshot.id,
+                delta = draft.quantity ?: 1.0,
+                reason = ChangeReason.SNAPSHOT_NEW,
+                createdAt = now,
+            ),
+        )
     }
 
     private companion object {

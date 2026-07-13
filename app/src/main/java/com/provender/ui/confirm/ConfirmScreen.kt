@@ -19,7 +19,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.provender.data.entity.SnapshotStatus
+import com.provender.data.entity.StorageLocation
 import com.provender.data.model.Category
 import com.provender.data.model.QuantityUnits
 import com.provender.ui.components.DropdownField
@@ -95,13 +98,20 @@ fun ConfirmScreen(
 
 @Composable
 private fun ReviewPane(state: ConfirmUiState, viewModel: ConfirmViewModel) {
+    val diff = state.diff
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
-            text = "Found ${state.rows.size} item(s) for ${state.locationName}",
+            text = when (state.mode) {
+                ConfirmMode.SEED -> "Found ${state.rows.size} item(s) for ${state.locationName}"
+                ConfirmMode.DIFF -> "Changes for ${state.locationName}"
+            },
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(16.dp),
         )
-        if (state.rows.isEmpty()) {
+
+        val nothingToShow = state.rows.isEmpty() &&
+            (diff == null || (diff.changed.isEmpty() && diff.missing.isEmpty()))
+        if (nothingToShow) {
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -110,19 +120,51 @@ private fun ReviewPane(state: ConfirmUiState, viewModel: ConfirmViewModel) {
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    "Nothing recognized. Add items below, or go back and retake the photos.",
+                    if (state.mode == ConfirmMode.DIFF) {
+                        "Everything matches your inventory — nothing changed."
+                    } else {
+                        "Nothing recognized. Add items below, or go back and retake the photos."
+                    },
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         } else {
             LazyColumn(modifier = Modifier.weight(1f)) {
-                items(state.rows, key = { it.localId }) { row ->
-                    ConfirmRowItem(
-                        row = row,
-                        onClick = { viewModel.onRowClick(row) },
-                        onDelete = { viewModel.onDeleteRow(row.localId) },
-                    )
+                if (state.rows.isNotEmpty()) {
+                    item(key = "header-new") { SectionHeader("New items (${state.rows.size})") }
+                    items(state.rows, key = { "new-${it.localId}" }) { row ->
+                        ConfirmRowItem(
+                            row = row,
+                            onClick = { viewModel.onRowClick(row) },
+                            onDelete = { viewModel.onDeleteRow(row.localId) },
+                        )
+                    }
+                }
+                if (diff != null && diff.changed.isNotEmpty()) {
+                    item(key = "header-changed") {
+                        SectionHeader("Quantity changes (${diff.changed.size})")
+                    }
+                    items(diff.changed, key = { "changed-${it.itemId}" }) { row ->
+                        ChangedRowItem(
+                            row = row,
+                            onToggle = { viewModel.onToggleChangedApply(row.itemId) },
+                        )
+                    }
+                }
+                if (diff != null && diff.missing.isNotEmpty()) {
+                    item(key = "header-missing") {
+                        SectionHeader("Not seen in the photos (${diff.missing.size})")
+                    }
+                    items(diff.missing, key = { "missing-${it.itemId}" }) { row ->
+                        MissingRowItem(
+                            row = row,
+                            locations = state.locations
+                                .filter { it.id != state.snapshot?.locationId },
+                            onDecision = { viewModel.onMissingDecision(row.itemId, it) },
+                            onMoveTarget = { viewModel.onMissingMoveTarget(row.itemId, it) },
+                        )
+                    }
                 }
             }
         }
@@ -137,16 +179,98 @@ private fun ReviewPane(state: ConfirmUiState, viewModel: ConfirmViewModel) {
             }
             Button(
                 onClick = viewModel::onCommit,
-                enabled = state.rows.isNotEmpty() && !state.isCommitting,
+                enabled = !state.isCommitting &&
+                    (state.mode == ConfirmMode.DIFF || state.rows.isNotEmpty()),
                 modifier = Modifier.weight(1f),
             ) {
                 Text(
-                    if (state.isCommitting) "Saving…"
-                    else "Add ${state.rows.size} to ${state.locationName}",
+                    when {
+                        state.isCommitting -> "Saving…"
+                        state.mode == ConfirmMode.SEED ->
+                            "Add ${state.rows.size} to ${state.locationName}"
+                        else -> "Apply changes"
+                    },
                 )
             }
         }
     }
+}
+
+@Composable
+private fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
+    )
+}
+
+@Composable
+private fun ChangedRowItem(row: ChangedRowUi, onToggle: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(row.name) },
+        supportingContent = {
+            Text("${formatAmount(row.oldQuantity, row.oldUnit)} → ${formatAmount(row.newQuantity, row.newUnit)}")
+        },
+        trailingContent = {
+            Checkbox(checked = row.apply, onCheckedChange = { onToggle() })
+        },
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+        modifier = Modifier.clickable(onClick = onToggle),
+    )
+}
+
+@Composable
+private fun MissingRowItem(
+    row: MissingRowUi,
+    locations: List<StorageLocation>,
+    onDecision: (MissingDecision) -> Unit,
+    onMoveTarget: (Long) -> Unit,
+) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(row.name, style = MaterialTheme.typography.bodyLarge)
+        Text(
+            formatAmount(row.quantity, row.unit),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = row.decision == MissingDecision.STILL_THERE,
+                onClick = { onDecision(MissingDecision.STILL_THERE) },
+                label = { Text("Still there") },
+            )
+            FilterChip(
+                selected = row.decision == MissingDecision.CONSUMED,
+                onClick = { onDecision(MissingDecision.CONSUMED) },
+                label = { Text("Consumed") },
+            )
+            FilterChip(
+                selected = row.decision == MissingDecision.MOVED,
+                onClick = { onDecision(MissingDecision.MOVED) },
+                label = { Text("Moved") },
+            )
+        }
+        if (row.decision == MissingDecision.MOVED) {
+            DropdownField(
+                label = "Moved to",
+                value = locations.firstOrNull { it.id == row.movedToLocationId }?.name ?: "—",
+                options = locations,
+                optionLabel = { it.name },
+                onSelect = { onMoveTarget(it.id) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+private fun formatAmount(quantity: Double?, unit: String?): String {
+    val amount = listOfNotNull(
+        quantity?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() },
+        unit,
+    ).joinToString(" ")
+    return amount.ifEmpty { "—" }
 }
 
 @Composable
