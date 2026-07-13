@@ -46,12 +46,19 @@ class FakeLlmEngine @Inject constructor() : LlmEngine {
         ),
     )
 
+    var rawPromptResult: (String) -> Result<String> = { prompt -> Result.success("echo: $prompt") }
+
+    var warmUpResult: Result<Unit> = Result.success(Unit)
+
     /** Simulated inference latency; keep 0 in tests. */
     var delayMillis: Long = 0
 
     /** Recorded calls, oldest first, for assertions. */
     val extractCalls = mutableListOf<Pair<List<PhotoInput>, String?>>()
     val ideaCalls = mutableListOf<IdeaRequest>()
+    val rawPromptCalls = mutableListOf<String>()
+    var warmUpCount = 0
+        private set
 
     override suspend fun extractInventory(
         photos: List<PhotoInput>,
@@ -66,5 +73,16 @@ class FakeLlmEngine @Inject constructor() : LlmEngine {
         ideaCalls += request
         if (delayMillis > 0) delay(delayMillis)
         return ideasResult
+    }
+
+    override suspend fun warmUp(): Result<Unit> {
+        warmUpCount++
+        return warmUpResult
+    }
+
+    override suspend fun rawPrompt(prompt: String): Result<String> {
+        rawPromptCalls += prompt
+        if (delayMillis > 0) delay(delayMillis)
+        return rawPromptResult(prompt)
     }
 }

@@ -1,6 +1,6 @@
 package com.provender.di
 
-import com.provender.ai.FakeLlmEngine
+import com.provender.ai.LitertLmEngine
 import com.provender.ai.LlmEngine
 import dagger.Binds
 import dagger.Module
@@ -12,8 +12,8 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 abstract class AiModule {
 
-    /** FakeLlmEngine until the LiteRT-LM implementation lands in Phase 2. */
+    /** The real on-device engine; tests keep using FakeLlmEngine directly. */
     @Binds
     @Singleton
-    abstract fun bindLlmEngine(impl: FakeLlmEngine): LlmEngine
+    abstract fun bindLlmEngine(impl: LitertLmEngine): LlmEngine
 }

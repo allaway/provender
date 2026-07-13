@@ -81,8 +81,11 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
-    // WorkManager (background generation / model download in later phases)
+    // WorkManager (model download now; background generation in Phase 8)
     implementation(libs.androidx.work.runtime.ktx)
+
+    // On-device AI runtime (LiteRT-LM + Gemma 3n). ML Kit arrives in Phase 3.
+    implementation(libs.litertlm.android)
 
     // Hilt
     implementation(libs.hilt.android)

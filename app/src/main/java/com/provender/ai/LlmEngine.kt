@@ -28,6 +28,19 @@ interface LlmEngine {
      * out downstream (Phase 8), not here.
      */
     suspend fun generateIdeas(request: IdeaRequest): Result<List<MealIdea>>
+
+    /**
+     * Eagerly loads the model session to hide cold-start latency (SPEC §2). Called from
+     * `Application.onCreate`; fails softly (and cheaply) when the model isn't downloaded
+     * or the device isn't capable.
+     */
+    suspend fun warmUp(): Result<Unit>
+
+    /**
+     * Debug-only raw prompting for the hidden debug screen (SPEC §6 Phase 2). Feature code
+     * must never call this — use the typed methods above.
+     */
+    suspend fun rawPrompt(prompt: String): Result<String>
 }
 
 /** A photo handed to the engine; URI string of an app-private, already-downscaled image. */
