@@ -19,4 +19,7 @@ object DatabaseModule {
     fun provideDatabase(@ApplicationContext context: Context): ProvenderDatabase =
         Room.databaseBuilder(context, ProvenderDatabase::class.java, ProvenderDatabase.NAME)
             .build()
+
+    @Provides
+    fun provideBarcodeCacheDao(database: ProvenderDatabase) = database.barcodeCacheDao()
 }

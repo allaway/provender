@@ -5,6 +5,12 @@
     <!-- Non-AI networking only: recipe data, barcode lookups, one-time model download. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Snapshot capture. Photos stay in app-private storage and never leave the device. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
     <application
         android:name=".ProvenderApp"
         android:allowBackup="true"

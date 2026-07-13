@@ -84,8 +84,19 @@ dependencies {
     // WorkManager (model download now; background generation in Phase 8)
     implementation(libs.androidx.work.runtime.ktx)
 
-    // On-device AI runtime (LiteRT-LM + Gemma 3n). ML Kit arrives in Phase 3.
+    // On-device AI runtime (LiteRT-LM + Gemma 3n)
     implementation(libs.litertlm.android)
+
+    // ML Kit (fully on-device): barcode scanning + label OCR
+    implementation(libs.mlkit.barcode.scanning)
+    implementation(libs.mlkit.text.recognition)
+    implementation(libs.kotlinx.coroutines.play.services)
+
+    // CameraX
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
 
     // Hilt
     implementation(libs.hilt.android)

@@ -16,6 +16,10 @@ import retrofit2.converter.kotlinx.serialization.asConverterFactory
 @Retention(AnnotationRetention.RUNTIME)
 annotation class TheMealDb
 
+@Qualifier
+@Retention(AnnotationRetention.RUNTIME)
+annotation class OpenFoodFacts
+
 /**
  * Non-AI networking only (SPEC.md design principle): recipe data, barcode lookups, and the
  * one-time model download. Wired now so later phases just add API interfaces; nothing calls
@@ -42,6 +46,16 @@ object NetworkModule {
     fun provideTheMealDbRetrofit(client: OkHttpClient, json: Json): Retrofit =
         Retrofit.Builder()
             .baseUrl("https://www.themealdb.com/api/json/v1/1/")
+            .client(client)
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .build()
+
+    @Provides
+    @Singleton
+    @OpenFoodFacts
+    fun provideOpenFoodFactsRetrofit(client: OkHttpClient, json: Json): Retrofit =
+        Retrofit.Builder()
+            .baseUrl("https://world.openfoodfacts.org/")
             .client(client)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
