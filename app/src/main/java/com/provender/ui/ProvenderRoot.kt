@@ -15,11 +15,15 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.provender.ui.debug.DebugLlmScreen
 import com.provender.ui.inventory.InventoryScreen
 import com.provender.ui.navigation.TopLevelDestination
 import com.provender.ui.recipes.RecipesScreen
 import com.provender.ui.roulette.RouletteScreen
 import com.provender.ui.settings.SettingsScreen
+
+/** Hidden route — reachable only via the secret gesture in Settings, never the nav bar. */
+private const val DEBUG_LLM_ROUTE = "debug/llm"
 
 @Composable
 fun ProvenderRoot() {
@@ -59,7 +63,14 @@ fun ProvenderRoot() {
             composable(TopLevelDestination.INVENTORY.route) { InventoryScreen() }
             composable(TopLevelDestination.RECIPES.route) { RecipesScreen() }
             composable(TopLevelDestination.ROULETTE.route) { RouletteScreen() }
-            composable(TopLevelDestination.SETTINGS.route) { SettingsScreen() }
+            composable(TopLevelDestination.SETTINGS.route) {
+                SettingsScreen(
+                    onOpenDebugLlm = { navController.navigate(DEBUG_LLM_ROUTE) },
+                )
+            }
+            composable(DEBUG_LLM_ROUTE) {
+                DebugLlmScreen(onBack = { navController.popBackStack() })
+            }
         }
     }
 }
