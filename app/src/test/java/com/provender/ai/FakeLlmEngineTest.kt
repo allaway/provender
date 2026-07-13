@@ -31,6 +31,24 @@ class FakeLlmEngineTest {
     }
 
     @Test
+    fun `rawPrompt echoes and records for the debug screen`() = runTest {
+        val engine = FakeLlmEngine()
+
+        val result = engine.rawPrompt("hello model")
+
+        assertEquals("echo: hello model", result.getOrThrow())
+        assertEquals(listOf("hello model"), engine.rawPromptCalls)
+    }
+
+    @Test
+    fun `warmUp succeeds by default and counts calls`() = runTest {
+        val engine = FakeLlmEngine()
+
+        assertTrue(engine.warmUp().isSuccess)
+        assertEquals(1, engine.warmUpCount)
+    }
+
+    @Test
     fun `idea generation returns configured ideas`() = runTest {
         val engine = FakeLlmEngine()
         val request = IdeaRequest(

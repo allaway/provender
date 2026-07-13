@@ -10,7 +10,7 @@ for the full product & technical spec before making changes.
 
 - [x] **Phase 0 — Scaffold**: Gradle project, Hilt, Room, Compose navigation, theme, Settings shell, CI-friendly build
 - [x] **Phase 1 — Inventory core**: entities/DAOs, manual CRUD, locations, search (FTS), staples, change log
-- [ ] **Phase 2 — Model runtime**: LiteRT-LM integration, model download manager + progress UI, device capability gating, hidden debug prompt screen (`LlmEngine` interface + fake already exist from Phase 0)
+- [x] **Phase 2 — Model runtime**: LiteRT-LM integration, model download manager + progress UI, device capability gating, hidden debug prompt screen (tap the Settings model row 7×)
 - [ ] **Phase 3 — Vision capture**: CameraX flow, ML Kit OCR, extraction prompt + parsing, Confirm screen (seed mode), barcode mode + Open Food Facts cache
 - [ ] **Phase 4 — Diffing**: fuzzy matching, three-part diff UI, change-log integration
 - [ ] **Phase 5 — Paprika + matching**: `.paprikarecipes` import, ingredient parser, matching engine, Matches tab
@@ -38,15 +38,17 @@ in the catalog, never inline in build files.
 
 ```
 app/src/main/java/com/provender/
-  data/        # Room entities, DAOs, database, repositories
-  network/     # TheMealDB client, Open Food Facts client, model downloader (Phase 6/3/2)
-  ai/          # LlmEngine interface, FakeLlmEngine; LiteRT-LM impl + prompts arrive in Phase 2
+  data/        # Room entities, DAOs, database, repositories; settings/ (SharedPreferences)
+  network/     # ModelDownloadWorker; TheMealDB + Open Food Facts clients (Phase 6/3)
+  ai/          # LlmEngine + FakeLlmEngine + LitertLmEngine, prompts, lenient JSON parsing,
+               #   ModelVariant/ModelRepository/ModelState, capability gating
   mlkit/       # barcode + OCR wrappers (Phase 3)
   paprika/     # .paprikarecipes import (Phase 5)
   matching/    # normalization, synonym map, scoring (normalizer exists; rest Phase 5)
   roulette/    # deck building, filters (Phase 7)
   generate/    # flexible-recipe prompt building + validation + cache (Phase 8)
-  ui/          # Compose screens: theme/, navigation/, inventory/, recipes/, roulette/, settings/
+  ui/          # Compose screens: theme/, navigation/, inventory/, recipes/, roulette/,
+               #   settings/, debug/ (hidden LLM console)
   di/          # Hilt modules
 ```
 
@@ -111,6 +113,28 @@ tree — create them when their phase starts.
   its final version and is forward-compatible.
 - **`app/schemas/` is committed but empty until the first local build** — Room writes
   `1.json` there during KSP; commit it when it appears so future migrations diff cleanly.
+- **LiteRT-LM API usage verified against upstream source** (July 2026,
+  `google-ai-edge/LiteRT-LM@main`, `kotlin/java/com/google/ai/edge/litertlm/`): blocking
+  `Engine(EngineConfig).initialize()`, `createConversation(ConversationConfig)`,
+  `sendMessage(text|Contents): Message`, `Contents.of(Content.ImageFile|Text)`,
+  `SamplerConfig(topK, topP, temperature)`, `Backend.CPU()/GPU()`. All calls run on
+  Dispatchers.IO behind one Mutex; `Message.toString()` yields the reply text.
+- **Gemma weights come from license-gated Hugging Face repos** — unauthenticated download
+  returns 401/403 until the user accepts Google's license. No token UI (the no-API-key rule
+  is interpreted strictly); instead the worker's error explains the situation and Settings
+  offers a document-picker **Import** of a browser-downloaded `.litertlm` file. `adb push`
+  into `filesDir/models/` also works.
+- **Model downloads run as plain (non-foreground) WorkManager jobs** with UNMETERED +
+  storage-not-low constraints and `.part` Range-resume. A dataSync foreground service with
+  notification is deliberate future polish, not Phase 2.
+- **CPU/GPU is a manual Settings toggle for now** (CPU default). The SPEC's per-device
+  benchmark-and-persist idea is deferred; the `LlmBackend` pref is where it would land.
+- **`LlmEngine` grew `warmUp()` and debug-only `rawPrompt()`** beyond SPEC §4's two methods:
+  warmUp implements the eager-init requirement, rawPrompt feeds the hidden debug console
+  (reached by tapping Settings → "On-device model" seven times). Feature code must never
+  call rawPrompt.
+- **Capability gate**: arm64-v8a required; total RAM ≥ ~5.5 GiB for E2B, ≥ 7 GiB for E4B.
+  Below that the model UI is disabled with an explanation (barcode/manual entry unaffected).
 - **First build in this repo has not been machine-verified** (sandbox network restriction
   above). If a version in `libs.versions.toml` fails to resolve, bump only the patch digit
   first — every group/artifact coordinate was verified against Maven listings in July 2026.
