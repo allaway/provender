@@ -30,6 +30,9 @@ when a phase completes.
 ./gradlew installDebug           # install on a connected device/emulator
 ```
 
+CI (`.github/workflows/build.yml`) runs `test` + `assembleDebug` (uploading the debug APK) and
+`lintDebug` on every push to `main`, every PR, and on manual dispatch.
+
 Requires JDK 17+ (JDK 21 works) and the Android SDK (compileSdk 36). Gradle wrapper is 8.14.3,
 AGP 8.13.0, Kotlin 2.2.20 — see `gradle/libs.versions.toml` for everything; all versions live
 in the catalog, never inline in build files.
