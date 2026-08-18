@@ -22,11 +22,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      # JDK 21: Robolectric's runtime needs a newer class file version than 17.
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -39,15 +40,19 @@ jobs:
       - name: Unit tests
         run: ./gradlew test --stacktrace
 
+      # Assemble even when tests fail: "does it build" is a separate signal
+      # from "do the tests pass", and both are useful in one run.
       - name: Assemble debug APK
+        if: ${{ !cancelled() }}
         run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload debug APK
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: provender-debug-apk
           path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+          if-no-files-found: warn
 
       - name: Upload test reports
         if: ${{ !cancelled() }}
@@ -67,11 +72,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
