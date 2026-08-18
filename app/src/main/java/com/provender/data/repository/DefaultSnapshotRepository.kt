@@ -90,7 +90,8 @@ class DefaultSnapshotRepository @Inject constructor(
             runCatching {
                 val smallPaths = paths.map { downscaler.downscale(it) }
                 val ocrText = paths
-                    .joinToString("\n") { ocrClient.recognizeText(it) }
+                    .map { ocrClient.recognizeText(it) }
+                    .joinToString("\n")
                     .trim()
                     .takeIf { it.isNotBlank() }
                 llmEngine

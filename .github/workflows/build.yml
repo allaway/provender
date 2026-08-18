@@ -1,9 +1,9 @@
 name: Build
 
 on:
+  # Every branch, not just the default one: this repo has no `main`, and work
+  # happens on feature branches. Same-repo PRs get their check from the push.
   push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
 
 concurrency:
